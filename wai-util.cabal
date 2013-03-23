@@ -37,6 +37,7 @@ library
                 text,
                 case-insensitive,
                 mime-mail,
+                http-accept,
                 network >= 2.4.0.0,
                 http-types >= 0.7.2
 

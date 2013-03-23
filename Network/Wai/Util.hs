@@ -2,6 +2,7 @@ module Network.Wai.Util where
 
 import Data.Char (isAscii)
 import Data.Maybe (fromMaybe)
+import Data.List (intercalate)
 import Data.Monoid (mappend, mempty)
 import Control.Monad (liftM2)
 import Control.Arrow ((***))
@@ -9,13 +10,15 @@ import Data.String (IsString, fromString)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 
 import Network.URI (URI, uriIsAbsolute)
-import Network.HTTP.Types (statusIsRedirection, Status, ResponseHeaders, Header)
-import Network.Wai (Request, Response(ResponseBuilder,ResponseFile,ResponseSource), responseLBS, requestBody, responseSource)
-import Network.Wai.Parse (BackEnd)
+import Network.HTTP.Types (statusIsRedirection, Status, ResponseHeaders, Header, notAcceptable406)
+import Network.Wai (Request, Response(ResponseBuilder,ResponseFile,ResponseSource), responseLBS, requestBody, requestHeaders, responseSource)
+import Network.Wai.Parse (BackEnd, parseHttpAccept)
 import Network.Mail.Mime (Part(..), Encoding(QuotedPrintableText, Base64))
 import Control.Monad.Trans.Resource (runResourceT, ResourceT)
 import Data.Conduit (($$), Flush(Chunk))
 import Data.Conduit.List (fold, sinkNull)
+
+import Network.HTTP.Accept (selectAcceptType)
 
 import Data.ByteString (ByteString)
 import Data.Text (Text)
@@ -25,6 +28,18 @@ import qualified Blaze.ByteString.Builder.Char.Utf8 as Builder
 import qualified Data.Aeson as Aeson
 import qualified Data.Text.Encoding as T
 import qualified Data.CaseInsensitive as CI
+
+-- | Build an Application that supports multiple Accept types (Content Negotiation)
+handleAcceptTypes :: (MonadIO m) => [(String, m Response)] -> Request -> m Response
+handleAcceptTypes handlers req =
+	fromMaybe notAcceptable handler
+	where
+	handler = lookup acceptType handlers
+	notAcceptable = string notAcceptable406 [] (intercalate "\n" supportedTypes)
+	acceptType = fromMaybe (head supportedTypes) acceptType'
+	acceptType' = (selectAcceptType supportedTypes . parseHttpAccept) =<<
+		lookup (fromString "Accept") (requestHeaders req)
+	supportedTypes = map fst handlers
 
 -- | 'BackeEnd' for 'parseRequestBody' that throws out any file uploads
 noStoreFileUploads :: BackEnd ()
