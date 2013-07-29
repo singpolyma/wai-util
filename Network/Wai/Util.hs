@@ -27,6 +27,7 @@ import qualified Blaze.ByteString.Builder as Builder
 import qualified Blaze.ByteString.Builder.Char.Utf8 as Builder
 import qualified Data.Aeson as Aeson
 import qualified Data.Text.Encoding as T
+import qualified Data.Text.Lazy.Builder as TL
 import qualified Data.CaseInsensitive as CI
 
 -- | Build an Application that supports multiple Accept types (Content Negotiation)
@@ -82,6 +83,12 @@ string status headers = return . defHeader defCT . ResponseBuilder status header
 -- | Smart constructor to build a 'Response' from a 'Text'
 text :: (MonadIO m) => Status -> ResponseHeaders -> Text -> m Response
 text status headers = return . defHeader defCT . ResponseBuilder status headers . Builder.fromText
+	where
+	Just defCT = stringHeader ("Content-Type", "text/plain; charset=utf-8")
+
+-- | Smart constructor to build a 'Response' from a 'Data.Text.Lazy.Builder.Builder'
+textBuilder :: (MonadIO m) => Status -> ResponseHeaders -> TL.Builder -> m Response
+textBuilder status headers = return . defHeader defCT . ResponseBuilder status headers . Builder.fromLazyText . TL.toLazyText
 	where
 	Just defCT = stringHeader ("Content-Type", "text/plain; charset=utf-8")
 
