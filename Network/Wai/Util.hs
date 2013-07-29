@@ -31,7 +31,7 @@ import qualified Data.Text.Lazy.Builder as TL
 import qualified Data.CaseInsensitive as CI
 
 -- | Build an Application that supports multiple Accept types (Content Negotiation)
-handleAcceptTypes :: (MonadIO m) => [(String, m Response)] -> Request -> m Response
+handleAcceptTypes :: (Monad m) => [(String, m Response)] -> Request -> m Response
 handleAcceptTypes handlers req =
 	fromMaybe notAcceptable handler
 	where
@@ -75,25 +75,25 @@ replaceHeader' :: Header -> ResponseHeaders -> ResponseHeaders
 replaceHeader' (n, v) = ((n,v):) . filter ((/=n) . fst)
 
 -- | Smart constructor to build a 'Response' from a 'String'
-string :: (MonadIO m) => Status -> ResponseHeaders -> String -> m Response
+string :: (Monad m) => Status -> ResponseHeaders -> String -> m Response
 string status headers = return . defHeader defCT . ResponseBuilder status headers . Builder.fromString
 	where
 	Just defCT = stringHeader ("Content-Type", "text/plain; charset=utf-8")
 
 -- | Smart constructor to build a 'Response' from a 'Text'
-text :: (MonadIO m) => Status -> ResponseHeaders -> Text -> m Response
+text :: (Monad m) => Status -> ResponseHeaders -> Text -> m Response
 text status headers = return . defHeader defCT . ResponseBuilder status headers . Builder.fromText
 	where
 	Just defCT = stringHeader ("Content-Type", "text/plain; charset=utf-8")
 
 -- | Smart constructor to build a 'Response' from a 'Data.Text.Lazy.Builder.Builder'
-textBuilder :: (MonadIO m) => Status -> ResponseHeaders -> TL.Builder -> m Response
+textBuilder :: (Monad m) => Status -> ResponseHeaders -> TL.Builder -> m Response
 textBuilder status headers = return . defHeader defCT . ResponseBuilder status headers . Builder.fromLazyText . TL.toLazyText
 	where
 	Just defCT = stringHeader ("Content-Type", "text/plain; charset=utf-8")
 
 -- | Smart constructor to build a JSON 'Response' using Aeson
-json :: (MonadIO m, Aeson.ToJSON a) => Status -> ResponseHeaders -> a -> m Response
+json :: (Monad m, Aeson.ToJSON a) => Status -> ResponseHeaders -> a -> m Response
 json status headers = return . defHeader defCT . responseLBS status headers . Aeson.encode . Aeson.toJSON
 	where
 	Just defCT = stringHeader ("Content-Type", "application/json; charset=utf-8")
