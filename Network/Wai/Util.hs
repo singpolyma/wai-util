@@ -1,4 +1,25 @@
-module Network.Wai.Util where
+module Network.Wai.Util (
+	handleAcceptTypes,
+	noStoreFileUploads,
+	bodyBytestring,
+	mapHeaders,
+	defHeader,
+	defHeader',
+	replaceHeader,
+	replaceHeader',
+	string,
+	text,
+	textBuilder,
+	json,
+	bytestring,
+	redirect,
+	redirect',
+	stringAscii,
+	stringHeader,
+	stringHeaders,
+	stringHeaders',
+	responseToMailPart
+) where
 
 import Data.Char (isAscii)
 import Data.Maybe (fromMaybe)
@@ -23,6 +44,7 @@ import Network.HTTP.Accept (selectAcceptType)
 import Data.ByteString (ByteString)
 import Data.Text (Text)
 
+import qualified Data.ByteString.Lazy as LZ
 import qualified Blaze.ByteString.Builder as Builder
 import qualified Blaze.ByteString.Builder.Char.Utf8 as Builder
 import qualified Data.Aeson as Aeson
@@ -97,6 +119,21 @@ json :: (Monad m, Aeson.ToJSON a) => Status -> ResponseHeaders -> a -> m Respons
 json status headers = return . defHeader defCT . responseLBS status headers . Aeson.encode . Aeson.toJSON
 	where
 	Just defCT = stringHeader ("Content-Type", "application/json; charset=utf-8")
+
+class IsByteString a where
+	bytestringToBuilder :: a -> Builder.Builder
+
+instance IsByteString ByteString where
+	bytestringToBuilder = Builder.fromByteString
+
+instance IsByteString LZ.ByteString where
+	bytestringToBuilder = Builder.fromLazyByteString
+
+-- | Smart constructor to build a 'Response' from a 'ByteString'
+bytestring :: (IsByteString bs, Monad m) => Status -> ResponseHeaders -> bs -> m Response
+bytestring status headers = return . defHeader defCT . ResponseBuilder status headers . bytestringToBuilder
+	where
+	Just defCT = stringHeader ("Content-Type", "application/octet-stream")
 
 -- | Smart constructor to build a redirect
 --
