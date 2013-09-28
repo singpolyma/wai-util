@@ -18,20 +18,22 @@ module Network.Wai.Util (
 	stringHeader,
 	stringHeaders,
 	stringHeaders',
-	responseToMailPart
+	responseToMailPart,
+	queryLookup
 ) where
 
 import Data.Char (isAscii)
 import Data.Maybe (fromMaybe)
 import Data.List (intercalate)
 import Data.Monoid (mappend, mempty)
-import Control.Monad (liftM2)
+import Control.Monad (liftM2,join)
 import Control.Arrow ((***))
 import Data.String (IsString, fromString)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 
 import Network.URI (URI, uriIsAbsolute)
 import Network.HTTP.Types (statusIsRedirection, Status, ResponseHeaders, Header, notAcceptable406)
+import Network.HTTP.Types.QueryLike (QueryLike, QueryKeyLike, toQuery, toQueryKey)
 import Network.Wai (Request, Response(ResponseBuilder,ResponseFile,ResponseSource), responseLBS, requestBody, requestHeaders, responseSource)
 import Network.Wai.Parse (BackEnd, parseHttpAccept)
 import Network.Mail.Mime (Part(..), Encoding(QuotedPrintableText, Base64))
@@ -43,6 +45,7 @@ import Network.HTTP.Accept (selectAcceptType)
 
 import Data.ByteString (ByteString)
 import Data.Text (Text)
+import Data.Text.Encoding.Error (lenientDecode)
 
 import qualified Data.ByteString.Lazy as LZ
 import qualified Blaze.ByteString.Builder as Builder
@@ -198,3 +201,7 @@ responseToMailPart asTxt r = do
 	builderBody = runResourceT $ body' $$ fold chunkFlatAppend mempty
 	(_, headers', body') = responseSource r
 	contentTypeName = fromString "Content-Type"
+
+-- | Lookup a given key in something that acts like a query
+queryLookup :: (QueryLike q, QueryKeyLike k) => q -> k -> Maybe Text
+queryLookup q k = fmap (T.decodeUtf8With lenientDecode) $ join $ lookup (toQueryKey k) (toQuery q)
