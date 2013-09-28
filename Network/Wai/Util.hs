@@ -19,11 +19,12 @@ module Network.Wai.Util (
 	stringHeaders,
 	stringHeaders',
 	responseToMailPart,
-	queryLookup
+	queryLookup,
+	queryLookupAll
 ) where
 
 import Data.Char (isAscii)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.List (intercalate)
 import Data.Monoid (mappend, mempty)
 import Control.Monad (liftM2,join)
@@ -203,5 +204,14 @@ responseToMailPart asTxt r = do
 	contentTypeName = fromString "Content-Type"
 
 -- | Lookup a given key in something that acts like a query
-queryLookup :: (QueryLike q, QueryKeyLike k) => q -> k -> Maybe Text
-queryLookup q k = fmap (T.decodeUtf8With lenientDecode) $ join $ lookup (toQueryKey k) (toQuery q)
+queryLookup :: (QueryLike q, QueryKeyLike k) => k -> q -> Maybe Text
+queryLookup k = fmap (T.decodeUtf8With lenientDecode) . join . lookup (toQueryKey k) . toQuery
+
+-- | Get all matches for a given key in something that acts like a query
+queryLookupAll :: (QueryLike q, QueryKeyLike k) => k -> q -> [Text]
+queryLookupAll k = map (T.decodeUtf8With lenientDecode) . mapMaybe f . toQuery
+	where
+	f (ik, mv)
+		| ik == k' = mv
+		| otherwise = Nothing
+	k' = toQueryKey k
