@@ -1,7 +1,10 @@
+{-# LANGUAGE CPP #-}
 module Network.Wai.Util (
 	handleAcceptTypes,
 	noStoreFileUploads,
+#if !MIN_VERSION_wai(2,0,0)
 	bodyBytestring,
+#endif
 	mapHeaders,
 	defHeader,
 	defHeader',
@@ -35,7 +38,13 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Network.URI (URI, uriIsAbsolute)
 import Network.HTTP.Types (statusIsRedirection, Status, ResponseHeaders, Header, notAcceptable406)
 import Network.HTTP.Types.QueryLike (QueryLike, QueryKeyLike, toQuery, toQueryKey)
-import Network.Wai (Request, Response(ResponseBuilder,ResponseFile,ResponseSource), responseLBS, requestBody, requestHeaders, responseSource)
+import Network.Wai (Request, responseLBS, requestBody, requestHeaders)
+#if MIN_VERSION_wai(2,0,0)
+import Network.Wai (responseToSource)
+import Network.Wai.Internal (Response(ResponseBuilder,ResponseFile,ResponseSource))
+#else
+import Network.Wai (Response(ResponseBuilder,ResponseFile,ResponseSource), responseSource)
+#endif
 import Network.Wai.Parse (BackEnd, parseHttpAccept)
 import Network.Mail.Mime (Part(..), Encoding(QuotedPrintableText, Base64))
 import Control.Monad.Trans.Resource (runResourceT, ResourceT)
@@ -72,9 +81,11 @@ handleAcceptTypes handlers req =
 noStoreFileUploads :: BackEnd ()
 noStoreFileUploads _ _ = sinkNull
 
+#if !MIN_VERSION_wai(2,0,0)
 -- | Slurp in the entire request body as a 'ByteString'
 bodyBytestring :: Request -> ResourceT IO ByteString
 bodyBytestring req = requestBody req $$ fold mappend mempty
+#endif
 
 -- | Run a function over the headers in a 'Response'
 mapHeaders :: (ResponseHeaders -> ResponseHeaders) -> Response -> Response
@@ -199,8 +210,13 @@ responseToMailPart asTxt r = do
 	               | otherwise = Base64
 	defContentType | asTxt     = fromString "text/plain; charset=utf-8"
 	               | otherwise = fromString "application/octet-stream"
+#if MIN_VERSION_wai(2,0,0)
+	builderBody = body' ($$ fold chunkFlatAppend mempty)
+	(_, headers', body') = responseToSource r
+#else
 	builderBody = runResourceT $ body' $$ fold chunkFlatAppend mempty
 	(_, headers', body') = responseSource r
+#endif
 	contentTypeName = fromString "Content-Type"
 
 -- | Lookup a given key in something that acts like a query
