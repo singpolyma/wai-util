@@ -39,7 +39,8 @@ library
                 mime-mail,
                 http-accept,
                 network >= 2.4.0.0,
-                http-types >= 0.7.2
+                http-types >= 0.7.2,
+                network-uri
 
 source-repository head
         type:     git
