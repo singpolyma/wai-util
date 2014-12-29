@@ -2,9 +2,6 @@
 module Network.Wai.Util (
 	handleAcceptTypes,
 	noStoreFileUploads,
-#if !MIN_VERSION_wai(2,0,0)
-	bodyBytestring,
-#endif
 	mapHeaders,
 	defHeader,
 	defHeader',
@@ -37,15 +34,11 @@ import Network.HTTP.Types.QueryLike (QueryLike, QueryKeyLike, toQuery, toQueryKe
 import Network.Wai (Request, responseLBS, requestHeaders)
 #if MIN_VERSION_wai(3,0,0)
 import Network.Wai.Internal (Response(ResponseBuilder,ResponseFile,ResponseStream,ResponseRaw))
-#elif MIN_VERSION_wai(2,0,0)
-import Network.Wai.Internal (Response(ResponseBuilder,ResponseFile,ResponseSource))
 #else
-import Network.Wai (Response(ResponseBuilder,ResponseFile,ResponseSource), responseSource)
-#endif
-import Network.Wai.Parse (BackEnd, parseHttpAccept)
-#if !MIN_VERSION_wai_extra(3,0,0)
+import Network.Wai.Internal (Response(ResponseBuilder,ResponseFile,ResponseSource))
 import Data.Conduit.List (sinkNull)
 #endif
+import Network.Wai.Parse (BackEnd, parseHttpAccept)
 
 import Network.HTTP.Accept (selectAcceptType)
 
@@ -78,12 +71,6 @@ noStoreFileUploads :: BackEnd ()
 noStoreFileUploads _ _ _ = return ()
 #else
 noStoreFileUploads _ _ = sinkNull
-#endif
-
-#if !MIN_VERSION_wai(2,0,0)
--- | Slurp in the entire request body as a 'ByteString'
-bodyBytestring :: Request -> ResourceT IO ByteString
-bodyBytestring req = requestBody req $$ fold mappend mempty
 #endif
 
 -- | Run a function over the headers in a 'Response'
