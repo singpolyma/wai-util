@@ -38,7 +38,7 @@ library
                 case-insensitive,
                 mime-mail,
                 http-accept,
-                network >= 2.4.0.0,
+                network-uri,
                 http-types >= 0.7.2
 
 source-repository head
