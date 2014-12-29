@@ -21,7 +21,6 @@ module Network.Wai.Util (
 	stringHeader,
 	stringHeaders,
 	stringHeaders',
-	responseToMailPart,
 	queryLookup,
 	queryLookupAll
 ) where
@@ -29,27 +28,24 @@ module Network.Wai.Util (
 import Data.Char (isAscii)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.List (intercalate)
-import Data.Monoid (mappend, mempty)
 import Control.Monad (liftM2,join)
-import Control.Arrow ((***))
 import Data.String (IsString, fromString)
-import Control.Monad.IO.Class (MonadIO, liftIO)
 
 import Network.URI (URI, uriIsAbsolute)
 import Network.HTTP.Types (statusIsRedirection, Status, ResponseHeaders, Header, notAcceptable406)
 import Network.HTTP.Types.QueryLike (QueryLike, QueryKeyLike, toQuery, toQueryKey)
-import Network.Wai (Request, responseLBS, requestBody, requestHeaders)
-#if MIN_VERSION_wai(2,0,0)
-import Network.Wai (responseToSource)
+import Network.Wai (Request, responseLBS, requestHeaders)
+#if MIN_VERSION_wai(3,0,0)
+import Network.Wai.Internal (Response(ResponseBuilder,ResponseFile,ResponseStream,ResponseRaw))
+#elif MIN_VERSION_wai(2,0,0)
 import Network.Wai.Internal (Response(ResponseBuilder,ResponseFile,ResponseSource))
 #else
 import Network.Wai (Response(ResponseBuilder,ResponseFile,ResponseSource), responseSource)
 #endif
 import Network.Wai.Parse (BackEnd, parseHttpAccept)
-import Network.Mail.Mime (Part(..), Encoding(QuotedPrintableText, Base64))
-import Control.Monad.Trans.Resource (runResourceT, ResourceT)
-import Data.Conduit (($$), Flush(Chunk))
-import Data.Conduit.List (fold, sinkNull)
+#if !MIN_VERSION_wai_extra(3,0,0)
+import Data.Conduit.List (sinkNull)
+#endif
 
 import Network.HTTP.Accept (selectAcceptType)
 
@@ -63,7 +59,6 @@ import qualified Blaze.ByteString.Builder.Char.Utf8 as Builder
 import qualified Data.Aeson as Aeson
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy.Builder as TL
-import qualified Data.CaseInsensitive as CI
 
 -- | Build an Application that supports multiple Accept types (Content Negotiation)
 handleAcceptTypes :: (Monad m) => [(String, m Response)] -> Request -> m Response
@@ -79,7 +74,11 @@ handleAcceptTypes handlers req =
 
 -- | 'BackeEnd' for 'parseRequestBody' that throws out any file uploads
 noStoreFileUploads :: BackEnd ()
+#if MIN_VERSION_wai_extra(3,0,0)
+noStoreFileUploads _ _ _ = return ()
+#else
 noStoreFileUploads _ _ = sinkNull
+#endif
 
 #if !MIN_VERSION_wai(2,0,0)
 -- | Slurp in the entire request body as a 'ByteString'
@@ -91,7 +90,12 @@ bodyBytestring req = requestBody req $$ fold mappend mempty
 mapHeaders :: (ResponseHeaders -> ResponseHeaders) -> Response -> Response
 mapHeaders f (ResponseFile s h b1 b2) = ResponseFile s (f h) b1 b2
 mapHeaders f (ResponseBuilder s h b) = ResponseBuilder s (f h) b
+#if MIN_VERSION_wai(3,0,0)
+mapHeaders f (ResponseStream s h b) = ResponseStream s (f h) b
+mapHeaders _ (ResponseRaw _ _) = error "Cannot mapHeaders of Wai.Interal.ResponseRaw"
+#else
 mapHeaders f (ResponseSource s h b) = ResponseSource s (f h) b
+#endif
 
 -- | Set a default value for a header in a 'Response'
 defHeader :: Header -> Response -> Response
@@ -157,7 +161,7 @@ redirect :: Status -> ResponseHeaders -> URI -> Maybe Response
 redirect status headers uri
 	| statusIsRedirection status && uriIsAbsolute uri = do
 		uriBS <- stringAscii (show uri)
-		return $ responseLBS status ((location, uriBS):headers) mempty
+		return $ responseLBS status ((location, uriBS):headers) LZ.empty
 	| otherwise = Nothing
 	where
 	Just location = stringAscii "Location"
@@ -193,31 +197,6 @@ stringHeaders = mapM stringHeader
 -- hard-coded values.
 stringHeaders' :: (IsString s1, IsString s2) => [(String, String)] -> [(s1, s2)]
 stringHeaders' hs = let Just headers = stringHeaders hs in headers
-
--- | Convert a WAI 'Response' to an email 'Part'
---
--- Useful for re-using 'Application' code/smart constructors to send emails
-responseToMailPart :: (MonadIO m) => Bool -> Response -> m Part
-responseToMailPart asTxt r = do
-	body <- liftIO $ Builder.toLazyByteString `fmap` builderBody
-	return $ Part (T.decodeUtf8 contentType) contentEncode Nothing headers body
-	where
-	chunkFlatAppend m (Chunk more) = m `mappend` more
-	chunkFlatAppend m _ = m
-	headers = map (CI.original *** T.decodeUtf8) $ filter ((/=contentTypeName) . fst) headers'
-	contentType = fromMaybe defContentType $ lookup contentTypeName headers'
-	contentEncode  | asTxt     = QuotedPrintableText
-	               | otherwise = Base64
-	defContentType | asTxt     = fromString "text/plain; charset=utf-8"
-	               | otherwise = fromString "application/octet-stream"
-#if MIN_VERSION_wai(2,0,0)
-	builderBody = body' ($$ fold chunkFlatAppend mempty)
-	(_, headers', body') = responseToSource r
-#else
-	builderBody = runResourceT $ body' $$ fold chunkFlatAppend mempty
-	(_, headers', body') = responseSource r
-#endif
-	contentTypeName = fromString "Content-Type"
 
 -- | Lookup a given key in something that acts like a query
 queryLookup :: (QueryLike q, QueryKeyLike k) => k -> q -> Maybe Text

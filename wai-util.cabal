@@ -1,5 +1,5 @@
 name:            wai-util
-version:         0.7
+version:         0.8
 cabal-version:   >= 1.8
 license:         OtherLicense
 license-file:    COPYING
@@ -28,15 +28,12 @@ library
                 base == 4.*,
                 wai,
                 wai-extra,
-                resourcet,
                 conduit,
                 aeson,
                 transformers,
                 blaze-builder,
                 bytestring,
                 text,
-                case-insensitive,
-                mime-mail,
                 http-accept,
                 network-uri,
                 http-types >= 0.7.2
