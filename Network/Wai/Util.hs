@@ -79,7 +79,7 @@ mapHeaders f (ResponseFile s h b1 b2) = ResponseFile s (f h) b1 b2
 mapHeaders f (ResponseBuilder s h b) = ResponseBuilder s (f h) b
 #if MIN_VERSION_wai(3,0,0)
 mapHeaders f (ResponseStream s h b) = ResponseStream s (f h) b
-mapHeaders _ (ResponseRaw _ _) = error "Cannot mapHeaders of Wai.Interal.ResponseRaw"
+mapHeaders f (ResponseRaw io resp)  = ResponseRaw io (mapHeaders f resp)
 #else
 mapHeaders f (ResponseSource s h b) = ResponseSource s (f h) b
 #endif
