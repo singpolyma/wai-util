@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 module Network.Wai.Util (
 	handleAcceptTypes,
 	noStoreFileUploads,
@@ -32,12 +31,7 @@ import Network.URI (URI, uriIsAbsolute)
 import Network.HTTP.Types (statusIsRedirection, Status, ResponseHeaders, Header, notAcceptable406)
 import Network.HTTP.Types.QueryLike (QueryLike, QueryKeyLike, toQuery, toQueryKey)
 import Network.Wai (Request, responseLBS, requestHeaders)
-#if MIN_VERSION_wai(3,0,0)
 import Network.Wai.Internal (Response(ResponseBuilder,ResponseFile,ResponseStream,ResponseRaw))
-#else
-import Network.Wai.Internal (Response(ResponseBuilder,ResponseFile,ResponseSource))
-import Data.Conduit.List (sinkNull)
-#endif
 import Network.Wai.Parse (BackEnd, parseHttpAccept)
 
 import Network.HTTP.Accept (selectAcceptType)
@@ -67,22 +61,14 @@ handleAcceptTypes handlers req =
 
 -- | 'BackeEnd' for 'parseRequestBody' that throws out any file uploads
 noStoreFileUploads :: BackEnd ()
-#if MIN_VERSION_wai_extra(3,0,0)
 noStoreFileUploads _ _ _ = return ()
-#else
-noStoreFileUploads _ _ = sinkNull
-#endif
 
 -- | Run a function over the headers in a 'Response'
 mapHeaders :: (ResponseHeaders -> ResponseHeaders) -> Response -> Response
 mapHeaders f (ResponseFile s h b1 b2) = ResponseFile s (f h) b1 b2
 mapHeaders f (ResponseBuilder s h b) = ResponseBuilder s (f h) b
-#if MIN_VERSION_wai(3,0,0)
 mapHeaders f (ResponseStream s h b) = ResponseStream s (f h) b
 mapHeaders f (ResponseRaw io resp)  = ResponseRaw io (mapHeaders f resp)
-#else
-mapHeaders f (ResponseSource s h b) = ResponseSource s (f h) b
-#endif
 
 -- | Set a default value for a header in a 'Response'
 defHeader :: Header -> Response -> Response
